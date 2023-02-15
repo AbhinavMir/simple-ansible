@@ -1,0 +1,43 @@
+ ---
+- hosts: kusama-nodes
+  gather_facts: yes
+  become: true
+
+  vars:
+    kusama_user: kusama
+    kusama_version: v0.9.8
+    kusama_data_dir: /var/lib/kusama
+    kusama_log_dir: /var/log/kusama
+
+  tasks:
+    - name: Add Kusama user
+      user:
+        name: "{{ kusama_user }}"
+        state: present
+        shell: /bin/bash
+
+    - name: Install dependencies
+      apt:
+        name: [curl, wget, jq, git, make, clang, pkg-config, libssl-dev, libudev-dev]
+        update_cache: yes
+
+    - name: Download and extract Kusama binary
+      unarchive:
+        src: "https://github.com/paritytech/substrate/releases/download/{{ kusama_version }}/kusama-{{ kusama_version }}-x86_64-unknown-linux-gnu.tar.gz"
+        dest: /opt/kusama
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Set ownership and permissions on Kusama directories
+      file:
+        path: "{{ item }}"
+        owner: "{{ kusama_user }}"
+        group: "{{ kusama_user }}"
+        mode: 0700
+      loop:
+        - "{{ kusama_data_dir }}"
+        - "{{ kusama_log_dir }}"
+
+    - name: Start Kusama node
+      become_user: "{{ kusama_user }}"
+      command: "/opt/kusama/kusama --base-path {{ kusama_data_dir }} --log {{ kusama_log_dir }}/kusama.log --rpc-cors all --ws-external --bootnodes /ip4/13.37.208.127/tcp/30344/p2p/12D3KooWCALzJ5r5fExQ1LeUa7VghQvv6UR67nVUaP6oJ7zUxgVK"
